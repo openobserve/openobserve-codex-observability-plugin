@@ -1,0 +1,40 @@
+{
+  "name": "@openobserve/codex-observability-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Export rich OpenAI Codex session traces to OpenObserve",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openobserve/openobserve-codex-observability-plugin.git"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    ".agents/plugins/marketplace.json",
+    "README.md",
+    "openobserve.example.json",
+    "plugins/openobserve/.codex-plugin/plugin.json",
+    "plugins/openobserve/dist/*.mjs",
+    "plugins/openobserve/hooks/hooks.json"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:check": "npm run build && git diff --exit-code -- plugins/openobserve/dist plugins/openobserve/hooks/hooks.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "npm run format:check && npm run type-check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "esbuild": "^0.25.8",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.0"
+  }
+}

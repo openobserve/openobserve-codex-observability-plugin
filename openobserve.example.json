@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "endpoint": "https://openobserve.example.com",
+  "organization": "default",
+  "stream_name": "codex",
+  "authorization": "Basic REPLACE_WITH_BASE64_USER_AND_PASSWORD",
+  "capture_content": true,
+  "capture_reasoning": false,
+  "capture_tool_content": true,
+  "max_chars": 20000,
+  "environment": "development",
+  "service_name": "codex"
+}

@@ -1,0 +1,26 @@
+{
+  "name": "openobserve",
+  "version": "0.1.0",
+  "description": "Trace Codex sessions, model calls, tools, and subagents to OpenObserve.",
+  "author": {
+    "name": "OpenObserve",
+    "url": "https://openobserve.ai"
+  },
+  "homepage": "https://openobserve.ai",
+  "repository": "https://github.com/openobserve/openobserve-codex-observability-plugin",
+  "license": "AGPL-3.0-only",
+  "keywords": ["codex", "opentelemetry", "openobserve", "observability", "tracing"],
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "OpenObserve Tracing",
+    "shortDescription": "Trace Codex sessions to OpenObserve",
+    "longDescription": "Reconstructs completed Codex turns from local transcripts and exports prompts, responses, model usage, tool calls, and subagents as OpenTelemetry traces to OpenObserve.",
+    "developerName": "OpenObserve",
+    "category": "Coding",
+    "capabilities": ["Read"],
+    "websiteURL": "https://openobserve.ai",
+    "defaultPrompt": [],
+    "brandColor": "#6152D9",
+    "screenshots": []
+  }
+}

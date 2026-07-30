@@ -1,0 +1,20 @@
+{
+  "name": "openobserve-codex",
+  "interface": {
+    "displayName": "OpenObserve Codex"
+  },
+  "plugins": [
+    {
+      "name": "openobserve",
+      "source": {
+        "source": "local",
+        "path": "./plugins/openobserve"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    }
+  ]
+}
