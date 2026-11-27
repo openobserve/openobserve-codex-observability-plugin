@@ -36,5 +36,12 @@ if (!handler || handler.type !== "command") {
   throw new Error("Stop hook manifest does not contain the expected command handler");
 }
 handler.command = `node \"\${PLUGIN_ROOT}/dist/${filename}\"`;
-handler.commandWindows = `node \"%PLUGIN_ROOT%\\dist\\${filename}\"`;
+// Read the path in Node so neither PowerShell nor cmd.exe has to expand it.
+const windowsLauncher = [
+  `const bundle = require('node:path').join(process.env.PLUGIN_ROOT, 'dist', '${filename}');`,
+  "const { status, error } = require('node:child_process').spawnSync(process.execPath, [bundle], { stdio: 'inherit' });",
+  "if (error) throw error;",
+  "process.exitCode = status ?? 1;",
+].join(" ");
+handler.commandWindows = `node -e "${windowsLauncher}"`;
 await writeFile(hooksPath, `${JSON.stringify(hooks, null, 2)}\n`, "utf8");

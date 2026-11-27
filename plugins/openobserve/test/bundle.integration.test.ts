@@ -102,6 +102,35 @@ describe("installed hook bundle", () => {
       );
     }
   });
+
+  it.skipIf(process.platform !== "win32").each(["powershell.exe", "cmd.exe"])(
+    "passes the Stop hook input to the bundle under %s",
+    async (shell) => {
+      const { bundlePath, filename, commandWindows } = await installedBundle();
+      const root = await mkdtemp(join(tmpdir(), "openobserve codex bundle "));
+      temporaryDirectories.push(root);
+      await mkdir(join(root, "dist"));
+      await writeFile(join(root, "dist", filename), await readFile(bundlePath));
+      const isPowerShell = shell === "powershell.exe";
+
+      const result = await runHook(
+        isPowerShell ? shell : commandWindows,
+        isPowerShell ? ["-NoProfile", "-NonInteractive", "-Command", commandWindows] : [],
+        "invalid JSON",
+        process.cwd(),
+        {
+          ...process.env,
+          CODEX_HOME: root,
+          PLUGIN_ROOT: root,
+          OPENOBSERVE_CODEX_FAIL_ON_ERROR: "true",
+        },
+        isPowerShell ? undefined : shell,
+      );
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("Stop hook input is not valid JSON");
+    },
+  );
 });
 
 async function installedBundle(): Promise<{
@@ -132,9 +161,21 @@ async function runBundle(
   cwd: string,
   env: NodeJS.ProcessEnv,
 ): Promise<{ code: number | null; stderr: string }> {
-  const child = spawn(process.execPath, [bundlePath], {
+  return runHook(process.execPath, [bundlePath], input, cwd, env);
+}
+
+async function runHook(
+  command: string,
+  args: string[],
+  input: string,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  shell?: string,
+): Promise<{ code: number | null; stderr: string }> {
+  const child = spawn(command, args, {
     cwd,
     env,
+    shell,
     stdio: ["pipe", "ignore", "pipe"],
   });
   let stderr = "";
