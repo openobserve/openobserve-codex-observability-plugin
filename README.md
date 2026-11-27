@@ -143,6 +143,12 @@ Important attributes include:
 - `gen_ai.tool.name`, `gen_ai.tool.call.arguments`, and `gen_ai.tool.call.result`
 - `gen_ai.agent.id`, `gen_ai.agent.name`, and `gen_ai.conversation.id`
 - `codex.turn.id` and `codex.thread.id`
+- `codex.thread.name` and `codex.turn.answer_preview` on the `codex.turn` root span
+
+With `capture_content` enabled, the root span includes the thread name recorded in
+`$CODEX_HOME/session_index.jsonl`, when available, and up to 500 characters of the final assistant
+reply. These fields are redacted using the same rules as message content. The name is a snapshot at
+export time; use `codex.thread.id` to group turns across renames.
 
 Model-call boundaries are reconstructed heuristically because Codex transcripts do not persist a
 stable identifier for every upstream response. The trace marks reconstructed generations with

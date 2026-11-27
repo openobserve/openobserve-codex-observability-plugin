@@ -453,6 +453,7 @@ function buildOtlpExportRequest(session, turn, config, traceIdOverride) {
   const rootSpanId = spanIdFor(traceId, "turn");
   const agentSpanId = spanIdFor(traceId, "agent");
   const spans = [];
+  const finalAnswer = config.captureContent ? [...turn.assistantMessages].reverse().find((message) => message.phase === "final_answer" || message.phase === "final")?.content : void 0;
   spans.push(
     makeSpan({
       traceId,
@@ -466,6 +467,8 @@ function buildOtlpExportRequest(session, turn, config, traceIdOverride) {
         "gen_ai.conversation.id": turn.threadId,
         "codex.turn.id": turn.id,
         "codex.thread.id": turn.threadId,
+        "codex.thread.name": config.captureContent && session.threadName ? redactAndTruncate(session.threadName, Math.min(config.maxChars, MAX_METADATA_CHARS)) : void 0,
+        "codex.turn.answer_preview": finalAnswer ? redactAndTruncate(finalAnswer, Math.min(config.maxChars, 500)) : void 0,
         "codex.turn.status": turn.status,
         "codex.source": session.source,
         "codex.originator": session.originator,
@@ -1240,7 +1243,8 @@ function debug(config, message) {
 }
 function turnRevision(session, turn, config) {
   const canonicalTrace = buildOtlpExportRequest(
-    session,
+    // A rename changes future trace labels but should not re-export an otherwise identical turn.
+    { ...session, threadName: void 0 },
     turn,
     config,
     traceIdForTurn(session.id, turn.id)
@@ -2831,7 +2835,8 @@ async function runHook(input, options = {}) {
     if (!hook.transcript_path) {
       throw new Error("Stop hook did not provide a transcript path");
     }
-    const trustedTranscript = await readTrustedTranscript(hook.transcript_path, env);
+    const codexHome = resolve4(env.CODEX_HOME ?? join3(homedir2(), ".codex"));
+    const trustedTranscript = await readTrustedTranscript(hook.transcript_path, codexHome);
     const transcript = trustedTranscript.contents;
     const session = parseRolloutTranscript(transcript, hook);
     if (session.id !== hook.session_id) {
@@ -2841,6 +2846,9 @@ async function runHook(input, options = {}) {
     const turn = session.turns.find((candidate) => candidate.id === hook.turn_id);
     if (!turn) {
       throw new Error(`Stop-hook turn ${safeIdentifier(hook.turn_id)} was not found`);
+    }
+    if (config.captureContent) {
+      session.threadName = await readThreadName(codexHome, session.id);
     }
     if (config.debug) {
       for (const diagnostic of session.diagnostics) {
@@ -2940,11 +2948,10 @@ function parseEnvironmentBoolean(value) {
 function safeIdentifier(value) {
   return value.replace(/[^A-Za-z0-9._:-]/g, "?").slice(0, 128);
 }
-async function readTrustedTranscript(transcriptPath, env) {
+async function readTrustedTranscript(transcriptPath, codexHome) {
   if (!isAbsolute3(transcriptPath)) {
     throw new Error("Stop-hook transcript path must be absolute");
   }
-  const codexHome = resolve4(env.CODEX_HOME ?? join3(homedir2(), ".codex"));
   const sessionsRoot = await realpath(join3(codexHome, "sessions"));
   const canonicalPath = await realpath(transcriptPath);
   const pathWithinSessions = relative2(sessionsRoot, canonicalPath);
@@ -2963,6 +2970,27 @@ async function readTrustedTranscript(transcriptPath, env) {
     throw new Error(`Stop-hook transcript exceeds ${MAX_TRANSCRIPT_BYTES} bytes`);
   }
   return { path: canonicalPath, contents };
+}
+async function readThreadName(codexHome, sessionId) {
+  let index;
+  try {
+    index = await readFile4(join3(codexHome, "session_index.jsonl"), "utf8");
+  } catch {
+    return void 0;
+  }
+  const lines = index.split("\n");
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (isRecord3(entry) && entry.id === sessionId && typeof entry.thread_name === "string") {
+        return entry.thread_name.trim() || void 0;
+      }
+    } catch {
+    }
+  }
+  return void 0;
 }
 function isRecord3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -38,6 +38,7 @@ describe("Stop hook integration", () => {
       const codexHome = join(root, ".codex");
       const project = join(root, "project");
       const transcriptPath = join(codexHome, "sessions", "rollout-session-hook.jsonl");
+      const indexPath = join(codexHome, "session_index.jsonl");
       await Promise.all([
         writeJson(join(codexHome, "openobserve.json"), {
           enabled: true,
@@ -49,6 +50,15 @@ describe("Stop hook integration", () => {
           capture_tool_content: true,
         }),
         writeText(transcriptPath, rollout()),
+        writeText(
+          indexPath,
+          [
+            '{"id":"session-hook","thread_name":"Old name"}',
+            '{"id":"session-hook","thread_name":"Architecture review token=example-secret"}',
+            '{"id":"other-session","thread_name":"Unrelated name"}',
+            '{"id":"session-hook",',
+          ].join("\n"),
+        ),
         mkdir(project, { recursive: true }),
       ]);
       const hook = JSON.stringify({
@@ -58,21 +68,47 @@ describe("Stop hook integration", () => {
         cwd: project,
         hook_event_name: "Stop",
         model: "gpt-hook",
-        last_assistant_message: "Hook response",
+        last_assistant_message: "Hook response token=example-secret",
       });
       const env = { CODEX_HOME: codexHome, PLUGIN_DATA: join(root, "plugin-data") };
 
       const first = await runHook(hook, { env });
+      await writeText(indexPath, '{"id":"session-hook","thread_name":"Renamed review"}\n');
       const second = await runHook(hook, { env });
 
       expect(first.status).toBe("exported");
       expect(second.status).toBe("deduplicated");
       expect(requests).toHaveLength(1);
       const spans = requests[0].resourceSpans[0].scopeSpans[0].spans;
+      const rootSpan = spans.find((span) => span.name === "codex.turn");
+      expect(rootSpan?.attributes).toEqual(
+        expect.arrayContaining([
+          {
+            key: "codex.thread.name",
+            value: { stringValue: "Architecture review token=[REDACTED]" },
+          },
+          {
+            key: "codex.turn.answer_preview",
+            value: { stringValue: "Hook response token=[REDACTED]" },
+          },
+        ]),
+      );
       const generation = spans.find((span) => span.name === "chat gpt-hook");
       expect(messageContent(generation, "gen_ai.input.messages")).toEqual(["Hook prompt"]);
-      expect(messageContent(generation, "gen_ai.output.messages")).toEqual(["Hook response"]);
+      expect(messageContent(generation, "gen_ai.output.messages")).toEqual([
+        "Hook response token=[REDACTED]",
+      ]);
       expect(generation?.status.code).toBe(1);
+
+      const metadataOnly = await runHook(hook, {
+        env: { ...env, OPENOBSERVE_CODEX_CAPTURE_CONTENT: "false" },
+      });
+      expect(metadataOnly.status).toBe("exported");
+      const metadataRoot = requests[1].resourceSpans[0].scopeSpans[0].spans[0];
+      expect(metadataRoot.attributes.map(({ key }) => key)).not.toContain("codex.thread.name");
+      expect(metadataRoot.attributes.map(({ key }) => key)).not.toContain(
+        "codex.turn.answer_preview",
+      );
     } finally {
       await new Promise<void>((resolveClose, rejectClose) =>
         server.close((error) => (error ? rejectClose(error) : resolveClose())),
@@ -192,7 +228,7 @@ function rollout(): string {
         type: "message",
         role: "assistant",
         phase: "final_answer",
-        content: [{ type: "output_text", text: "Hook response" }],
+        content: [{ type: "output_text", text: "Hook response token=example-secret" }],
       },
       4,
     ),

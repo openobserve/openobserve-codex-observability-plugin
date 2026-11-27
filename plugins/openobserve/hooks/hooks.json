@@ -5,10 +5,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${PLUGIN_ROOT}/dist/index.514487897304191e.mjs\"",
+            "command": "node \"${PLUGIN_ROOT}/dist/index.0b5e2e0a7e9b5dfd.mjs\"",
             "timeout": 30,
             "statusMessage": "Exporting Codex trace to OpenObserve",
-            "commandWindows": "node \"%PLUGIN_ROOT%\\dist\\index.514487897304191e.mjs\""
+            "commandWindows": "node \"%PLUGIN_ROOT%\\dist\\index.0b5e2e0a7e9b5dfd.mjs\""
           }
         ]
       }

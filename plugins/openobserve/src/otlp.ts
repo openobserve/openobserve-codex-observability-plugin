@@ -43,6 +43,11 @@ export function buildOtlpExportRequest(
   const rootSpanId = spanIdFor(traceId, "turn");
   const agentSpanId = spanIdFor(traceId, "agent");
   const spans: OtlpSpan[] = [];
+  const finalAnswer = config.captureContent
+    ? [...turn.assistantMessages]
+        .reverse()
+        .find((message) => message.phase === "final_answer" || message.phase === "final")?.content
+    : undefined;
 
   spans.push(
     makeSpan({
@@ -57,6 +62,13 @@ export function buildOtlpExportRequest(
         "gen_ai.conversation.id": turn.threadId,
         "codex.turn.id": turn.id,
         "codex.thread.id": turn.threadId,
+        "codex.thread.name":
+          config.captureContent && session.threadName
+            ? redactAndTruncate(session.threadName, Math.min(config.maxChars, MAX_METADATA_CHARS))
+            : undefined,
+        "codex.turn.answer_preview": finalAnswer
+          ? redactAndTruncate(finalAnswer, Math.min(config.maxChars, 500))
+          : undefined,
         "codex.turn.status": turn.status,
         "codex.source": session.source,
         "codex.originator": session.originator,
