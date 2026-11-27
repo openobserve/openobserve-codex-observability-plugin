@@ -85,6 +85,7 @@ export interface NormalizedTurn {
 
 export interface NormalizedSession {
   id: string;
+  threadName?: string;
   cwd?: string;
   originator?: string;
   cliVersion?: string;

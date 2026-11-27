@@ -52,7 +52,8 @@ export async function runHook(input: string, options: RunHookOptions = {}): Prom
       throw new Error("Stop hook did not provide a transcript path");
     }
 
-    const trustedTranscript = await readTrustedTranscript(hook.transcript_path, env);
+    const codexHome = resolve(env.CODEX_HOME ?? join(homedir(), ".codex"));
+    const trustedTranscript = await readTrustedTranscript(hook.transcript_path, codexHome);
     const transcript = trustedTranscript.contents;
     const session = parseRolloutTranscript(transcript, hook);
     if (session.id !== hook.session_id) {
@@ -64,6 +65,9 @@ export async function runHook(input: string, options: RunHookOptions = {}): Prom
       throw new Error(`Stop-hook turn ${safeIdentifier(hook.turn_id)} was not found`);
     }
 
+    if (config.captureContent) {
+      session.threadName = await readThreadName(codexHome, session.id);
+    }
     if (config.debug) {
       for (const diagnostic of session.diagnostics) {
         console.error(`[openobserve-codex] ${redactAndTruncate(diagnostic, 1_024)}`);
@@ -180,12 +184,11 @@ function safeIdentifier(value: string): string {
 
 async function readTrustedTranscript(
   transcriptPath: string,
-  env: NodeJS.ProcessEnv,
+  codexHome: string,
 ): Promise<{ path: string; contents: string }> {
   if (!isAbsolute(transcriptPath)) {
     throw new Error("Stop-hook transcript path must be absolute");
   }
-  const codexHome = resolve(env.CODEX_HOME ?? join(homedir(), ".codex"));
   const sessionsRoot = await realpath(join(codexHome, "sessions"));
   const canonicalPath = await realpath(transcriptPath);
   const pathWithinSessions = relative(sessionsRoot, canonicalPath);
@@ -208,6 +211,31 @@ async function readTrustedTranscript(
     throw new Error(`Stop-hook transcript exceeds ${MAX_TRANSCRIPT_BYTES} bytes`);
   }
   return { path: canonicalPath, contents };
+}
+
+async function readThreadName(codexHome: string, sessionId: string): Promise<string | undefined> {
+  let index: string;
+  try {
+    index = await readFile(join(codexHome, "session_index.jsonl"), "utf8");
+  } catch {
+    // The session index is optional enrichment, not a requirement for trace export.
+    return undefined;
+  }
+
+  const lines = index.split("\n");
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    try {
+      const entry: unknown = JSON.parse(line);
+      if (isRecord(entry) && entry.id === sessionId && typeof entry.thread_name === "string") {
+        return entry.thread_name.trim() || undefined;
+      }
+    } catch {
+      // Codex may be appending a record while the hook reads the index.
+    }
+  }
+  return undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

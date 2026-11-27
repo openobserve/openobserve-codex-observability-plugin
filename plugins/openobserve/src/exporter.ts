@@ -170,7 +170,8 @@ export function turnRevision(
   config: OpenObserveConfig,
 ): string {
   const canonicalTrace = buildOtlpExportRequest(
-    session,
+    // A rename changes future trace labels but should not re-export an otherwise identical turn.
+    { ...session, threadName: undefined },
     turn,
     config,
     traceIdForTurn(session.id, turn.id),
